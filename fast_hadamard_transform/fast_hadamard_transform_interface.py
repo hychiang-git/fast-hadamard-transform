@@ -180,19 +180,6 @@ def hadamard_transform_84N(x, scale=1.0):
     return HadamardTransform84NFn.apply(x, scale)
 
 
-from csrc.code_gen import had_12_paley
-
-def parse_hadamard(s):
-    lines = s.strip().split('\n')
-    matrix = []
-    for line in lines:
-        row = [1 if c == '+' else -1 for c in line.strip()]
-        matrix.append(row)
-    return np.array(matrix, dtype=int)
-
-def is_pow2(n):
-    return (n & (n - 1) == 0) and (n > 0)
-
 def hadamard_transform_ref(x, scale=1.0):
     """
     x: (..., dim)
@@ -203,20 +190,10 @@ def hadamard_transform_ref(x, scale=1.0):
     x_shape = x.shape
     dim = x.shape[-1]
     x = x.reshape(-1, dim)
-
-    if dim % 12 == 0:
-        assert (is_pow2(dim // 12))
-        H12 = parse_hadamard(had_12_paley)
-        N = dim // 12
-        H12_large = np.kron(np.eye(N, dtype=int), H12)
-        out = F.linear(x, torch.tensor(H12_large, dtype=x.dtype, device=x.device))
-        out = out * scale
-    else:
-        assert (is_pow2(dim))
-        log_dim = math.ceil(math.log2(dim))
-        dim_padded = 2 ** log_dim
-        if dim != dim_padded:
-            x = F.pad(x, (0, dim_padded - dim))
-        out = F.linear(x, torch.tensor(hadamard(dim_padded, dtype=float), dtype=x.dtype, device=x.device))
-        out = out * scale
+    log_dim = math.ceil(math.log2(dim))
+    dim_padded = 2 ** log_dim
+    if dim != dim_padded:
+        x = F.pad(x, (0, dim_padded - dim))
+    out = F.linear(x, torch.tensor(hadamard(dim_padded, dtype=float), dtype=x.dtype, device=x.device))
+    out = out * scale
     return out[..., :dim].reshape(*x_shape)
