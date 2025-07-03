@@ -43,8 +43,8 @@ void fast_hadamard_transform_40N_cuda(HadamardParamsBase &params, cudaStream_t s
 template<typename input_t>
 void fast_hadamard_transform_84N_cuda(HadamardParamsBase &params, cudaStream_t stream);
 
-template<typename input_t>
-void fast_hadamard_transform_172N_cuda(HadamardParamsBase &params, cudaStream_t stream);
+// template<typename input_t>
+// void fast_hadamard_transform_172N_cuda(HadamardParamsBase &params, cudaStream_t stream);
 
 void set_hadamard_params(HadamardParamsBase &params,
                          // sizes
