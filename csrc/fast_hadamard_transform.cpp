@@ -40,6 +40,12 @@ void fast_hadamard_transform_28N_cuda(HadamardParamsBase &params, cudaStream_t s
 template<typename input_t>
 void fast_hadamard_transform_40N_cuda(HadamardParamsBase &params, cudaStream_t stream);
 
+template<typename input_t>
+void fast_hadamard_transform_84N_cuda(HadamardParamsBase &params, cudaStream_t stream);
+
+template<typename input_t>
+void fast_hadamard_transform_172N_cuda(HadamardParamsBase &params, cudaStream_t stream);
+
 void set_hadamard_params(HadamardParamsBase &params,
                          // sizes
                          const size_t batch,
@@ -221,8 +227,7 @@ fast_hadamard_transform_28N(at::Tensor &x, float scale) {
     const int dim = x.size(1);
 
     TORCH_CHECK(dim % (4 * 28) == 0, "fast_hadamard_transform_28N only supports hidden dimension divisible by 112 for now");
-    // TORCH_CHECK(dim <= 28 * 1024, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
-    TORCH_CHECK(dim <= 28 * 2048, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
+    TORCH_CHECK(dim <= 28 * 1024, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
 
     at::Tensor out = torch::empty_like(x);
 
@@ -264,8 +269,8 @@ fast_hadamard_transform_40N(at::Tensor &x, float scale) {
     }
     const int dim = x.size(1);
 
-    TORCH_CHECK(dim % (4 * 40) == 0, "fast_hadamard_transform_40N only supports hidden dimension divisible by 112 for now");
-    TORCH_CHECK(dim <= 40 * 2048, "fast_hadamard_transform_40N only supports hidden dimension at most 4096 for now");
+    TORCH_CHECK(dim % (4 * 40) == 0, "fast_hadamard_transform_40N only supports hidden dimension divisible by 160 for now");
+    TORCH_CHECK(dim <= 40 * 1024, "fast_hadamard_transform_40N only supports hidden dimension at most 40960 for now");
 
     at::Tensor out = torch::empty_like(x);
 
@@ -285,10 +290,54 @@ fast_hadamard_transform_40N(at::Tensor &x, float scale) {
     return out.reshape(shapes_og);
 }
 
+at::Tensor
+fast_hadamard_transform_84N(at::Tensor &x, float scale) {
+    auto input_type = x.scalar_type();
+    TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
+
+    TORCH_CHECK(x.is_cuda());
+
+    const auto shapes_og = x.sizes();
+    const int dim_og = x.size(-1);
+    x = x.reshape({-1, dim_og});
+    if (x.stride(-1) != 1) { x = x.contiguous(); }
+    const auto sizes = x.sizes();
+    const int batch_size = sizes[0];
+
+    CHECK_SHAPE(x, batch_size, dim_og);
+    TORCH_CHECK(x.stride(1) == 1);
+
+    if (dim_og % (4 * 84) != 0) {
+        x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, (4 * 84) - dim_og % (4 * 84)}));
+    }
+    const int dim = x.size(1);
+
+    TORCH_CHECK(dim % (4 * 84) == 0, "fast_hadamard_transform_84N only supports hidden dimension divisible by 336 for now");
+    TORCH_CHECK(dim <= 84 * 1024, "fast_hadamard_transform_84N only supports hidden dimension at most 86016 for now");
+
+    at::Tensor out = torch::empty_like(x);
+
+    HadamardParamsBase params;
+    set_hadamard_params(params, batch_size, dim, 84, x, out, scale);
+
+    // Otherwise the kernel will be launched from cuda:0 device
+    // Cast to char to avoid compiler warning about narrowing
+    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
+        fast_hadamard_transform_84N_cuda<input_t>(params, stream);
+    });
+    if (dim_og % (8 * 84) != 0) {
+        out = out.index({torch::indexing::Slice(), torch::indexing::Slice(torch::indexing::None, dim_og)});
+    }
+    return out.reshape(shapes_og);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("fast_hadamard_transform", &fast_hadamard_transform, "Fast Hadamard transform");
     m.def("fast_hadamard_transform_12N", &fast_hadamard_transform_12N, "Fast Hadamard transform with dimension = 12 * power of 2");
     m.def("fast_hadamard_transform_20N", &fast_hadamard_transform_20N, "Fast Hadamard transform with dimension = 20 * power of 2");
     m.def("fast_hadamard_transform_28N", &fast_hadamard_transform_28N, "Fast Hadamard transform with dimension = 28 * power of 2");
     m.def("fast_hadamard_transform_40N", &fast_hadamard_transform_40N, "Fast Hadamard transform with dimension = 40 * power of 2");
+    m.def("fast_hadamard_transform_84N", &fast_hadamard_transform_84N, "Fast Hadamard transform with dimension = 84 * power of 2");
 }
