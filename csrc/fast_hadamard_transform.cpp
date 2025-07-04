@@ -357,7 +357,7 @@ fast_hadamard_transform_172N(at::Tensor &x, float scale) {
     const int dim = x.size(1);
 
     TORCH_CHECK(dim % (4 * 172) == 0, "fast_hadamard_transform_172N only supports hidden dimension divisible by 688 for now");
-    TORCH_CHECK(dim <= 172 * 512, "fast_hadamard_transform_172N only supports hidden dimension at most 88064 for now");
+    TORCH_CHECK(dim <= 172 * 1024, "fast_hadamard_transform_172N only supports hidden dimension at most 176128 for now");
 
     at::Tensor out = torch::empty_like(x);
 

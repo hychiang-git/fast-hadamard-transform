@@ -155,7 +155,7 @@ struct fast_hadamard_transform_172N_kernel_traits {
     static constexpr int kNThreads = kNThreads_;
     static constexpr int kLogN = kLogN_;
     static constexpr int N = (1 << kLogN) * 172;
-    static_assert(N <= 172 * 512, "fast_hadamard_transform_172 only supports dim <= 88064");
+    static_assert(N <= 172 * 1024, "fast_hadamard_transform_172 only supports dim <= 176128");
     static constexpr int kNBytes = sizeof(input_t);
     static_assert(kNBytes == 2 || kNBytes == 4);
     static constexpr int kNElts = 4;
@@ -166,7 +166,7 @@ struct fast_hadamard_transform_172N_kernel_traits {
     static constexpr int kNChunks = N / (kNElts * kNThreads);
     static_assert(kNChunks == 172);
     // We don't want to use more than 90 KB of shared memory.
-    static constexpr int kSmemExchangeSize = std::min(N * 4, 172 * 512);
+    static constexpr int kSmemExchangeSize = std::min(N * 4, 172 * 1024);
     static constexpr int kNExchangeRounds = N * 4 / kSmemExchangeSize;
     static_assert(kNExchangeRounds * kSmemExchangeSize == N * 4);
     static constexpr int kSmemSize = kSmemExchangeSize;
@@ -273,6 +273,8 @@ void fast_hadamard_transform_kernel(HadamardParamsBase params) {
             hadamard_mult_thread_chunk_40<kNElts>(x_vals_transposed);
         } else if constexpr (kNChunks == 84) {
             hadamard_mult_thread_chunk_84<kNElts>(x_vals_transposed);
+        } else if constexpr (kNChunks == 172) {
+            hadamard_mult_thread_chunk_172<kNElts>(x_vals_transposed);
         } else {
             constexpr int kLogNChunks = cilog2(kNChunks);
             static_assert(1 << kLogNChunks == kNChunks, "kNChunks must be a power of 2");
