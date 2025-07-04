@@ -174,10 +174,36 @@ def hadamard_transform_84N(x, scale=1.0):
     Returns:
         out: (..., dim)
 
-    Multiply each row of x by the Hadamard transform matrix, where dim = 40 * power of 2.
+    Multiply each row of x by the Hadamard transform matrix, where dim = 84 * power of 2.
     If dim is not 84 * a power of 2, we implicitly pad x with zero so that dim is 84 * the next power of 2.
     """
     return HadamardTransform84NFn.apply(x, scale)
+
+class HadamardTransform172NFn(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x, scale=1.0):
+        ctx._hadamard_transform_scale = scale
+        return fast_hadamard_transform_cuda.fast_hadamard_transform_172N(x, scale)
+
+    @staticmethod
+    def backward(ctx, dout):
+        # The Hadamard transform matrix is symmetric, so in the backward pass we multiply by its
+        # transpose, which is itself.
+        return fast_hadamard_transform_cuda.fast_hadamard_transform_172N(dout, ctx._hadamard_transform_scale), None
+
+def hadamard_transform_172N(x, scale=1.0):
+    """
+    Arguments:
+        x: (..., dim)
+        scale: float. Multiply the output by this number.
+    Returns:
+        out: (..., dim)
+
+    Multiply each row of x by the Hadamard transform matrix, where dim = 84 * power of 2.
+    If dim is not 172 * a power of 2, we implicitly pad x with zero so that dim is 172 * the next power of 2.
+    """
+    return HadamardTransform172NFn.apply(x, scale)
 
 
 def hadamard_transform_ref(x, scale=1.0):
